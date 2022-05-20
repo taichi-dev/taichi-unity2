@@ -14,8 +14,8 @@ struct DemoEventHandlerVulkan : public PluginEventHandlerVulkan {
     return out;
   }
   virtual void handle() override final {
-    float value = get_arg_f32(0);
-    counter += value;
+    const char* value = get_arg_str(0);
+    counter += std::atof(value);
     LAST_ERROR = counter;
   }
 };

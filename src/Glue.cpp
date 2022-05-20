@@ -84,6 +84,12 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgF32
   arg.arg_f32 = value;
   PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
 }
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgString(int32_t event_id, uint32_t binding, const char* str) {
+  PluginEventArg arg {};
+  arg.ty = L_EVENT_ARG_TYPE_STRING;
+  arg.arg_str = str;
+  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
+}
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgBufferPtr(int32_t event_id, uint32_t binding, void* native_buf) {
   PluginEventArg arg {};
   arg.ty = L_EVENT_ARG_TYPE_NATIVE_BUFFER;
@@ -112,6 +118,11 @@ float PluginEventHandler::get_arg_f32(uint32_t binding) const {
   const PluginEventArg& arg = args.at(binding);
   assert(arg.ty == L_EVENT_ARG_TYPE_F32);
   return arg.arg_f32;
+}
+const char* PluginEventHandler::get_arg_str(uint32_t binding) const {
+  const PluginEventArg& arg = args.at(binding);
+  assert(arg.ty == L_EVENT_ARG_TYPE_STRING);
+  return arg.arg_str;
 }
 void* PluginEventHandler::get_arg_native_buf(uint32_t binding) const {
   const PluginEventArg& arg = args.at(binding);
