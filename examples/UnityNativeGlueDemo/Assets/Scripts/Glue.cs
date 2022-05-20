@@ -39,14 +39,21 @@ public static class UnityNativeGlue {
 #else
     [DllImport("UnityNativeGlue")]
 #endif
-    private static extern void ungBindGfxEventArgBufferPtr(int eventId, uint binding, IntPtr native_buf);
+    private static extern void ungBindGfxEventArgPointer(int eventId, uint binding, IntPtr ptr);
 
 #if (UNITY_IOS || UNITY_TVOS || UNITY_WEBGL) && !UNITY_EDITOR
     [DllImport ("__Internal")]
 #else
     [DllImport("UnityNativeGlue")]
 #endif
-    private static extern void ungBindGfxEventArgTexturePtr(int eventId, uint binding, IntPtr native_tex);
+    private static extern void ungBindGfxEventArgNativeBuffer(int eventId, uint binding, IntPtr native_buf);
+
+#if (UNITY_IOS || UNITY_TVOS || UNITY_WEBGL) && !UNITY_EDITOR
+    [DllImport ("__Internal")]
+#else
+    [DllImport("UnityNativeGlue")]
+#endif
+    private static extern void ungBindGfxEventArgNativeTexture(int eventId, uint binding, IntPtr native_tex);
 
 
 #if (UNITY_IOS || UNITY_TVOS || UNITY_WEBGL) && !UNITY_EDITOR
@@ -79,12 +86,16 @@ public static class UnityNativeGlue {
             ungBindGfxEventArgString(_EventId, _BindingCounter++, str);
             return this;
         }
-        public EventBuilder ArgBufferPtr(IntPtr native_buf) {
-            ungBindGfxEventArgBufferPtr(_EventId, _BindingCounter++, native_buf);
+        public EventBuilder ArgPointer(IntPtr ptr) {
+            ungBindGfxEventArgPointer(_EventId, _BindingCounter++, ptr);
             return this;
         }
-        public EventBuilder ArgTexturePtr(IntPtr native_tex) {
-            ungBindGfxEventArgTexturePtr(_EventId, _BindingCounter++, native_tex);
+        public EventBuilder ArgNativeBuffer(IntPtr native_buf) {
+            ungBindGfxEventArgNativeBuffer(_EventId, _BindingCounter++, native_buf);
+            return this;
+        }
+        public EventBuilder ArgNativeTexture(IntPtr native_tex) {
+            ungBindGfxEventArgNativeTexture(_EventId, _BindingCounter++, native_tex);
             return this;
         }
 

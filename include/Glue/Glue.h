@@ -23,8 +23,9 @@ extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungGet
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgI32(int32_t event_id, uint32_t binding, int32_t value);
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgF32(int32_t event_id, uint32_t binding, float value);
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgString(int32_t event_id, uint32_t binding, const char* str);
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgBufferPtr(int32_t event_id, uint32_t binding, void* native_buf);
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgTexturePtr(int32_t event_id, uint32_t binding, void* native_tex);
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgPointer(int32_t event_id, uint32_t binding, void* str);
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgNativeBuffer(int32_t event_id, uint32_t binding, void* native_buf);
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgNativeTexture(int32_t event_id, uint32_t binding, void* native_tex);
 // Report error code for debugging.
 extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungGetLastError();
 
@@ -34,6 +35,7 @@ enum PluginEventArgType {
   L_EVENT_ARG_TYPE_I32,
   L_EVENT_ARG_TYPE_F32,
   L_EVENT_ARG_TYPE_STRING,
+  L_EVENT_ARG_TYPE_POINTER,
   L_EVENT_ARG_TYPE_NATIVE_BUFFER,
   L_EVENT_ARG_TYPE_NATIVE_TEXTURE,
 };
@@ -42,9 +44,8 @@ struct PluginEventArg {
   union {
     int32_t arg_i32;
     float arg_f32;
+    void* arg_ptr;
     const char* arg_str;
-    void* arg_native_buf;
-    void* arg_native_tex;
   };
 };
 struct PluginEventHandler {
@@ -60,6 +61,7 @@ struct PluginEventHandler {
   int32_t get_arg_i32(uint32_t binding) const;
   float get_arg_f32(uint32_t binding) const;
   const char* get_arg_str(uint32_t binding) const;
+  void* get_arg_ptr(uint32_t binding) const;
   void* get_arg_native_buf(uint32_t binding) const;
   void* get_arg_native_tex(uint32_t binding) const;
 

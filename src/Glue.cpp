@@ -90,16 +90,22 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgStr
   arg.arg_str = str;
   PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
 }
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgBufferPtr(int32_t event_id, uint32_t binding, void* native_buf) {
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgPointer(int32_t event_id, uint32_t binding, void* ptr) {
   PluginEventArg arg {};
-  arg.ty = L_EVENT_ARG_TYPE_NATIVE_BUFFER;
-  arg.arg_native_buf = native_buf;
+  arg.ty = L_EVENT_ARG_TYPE_POINTER;
+  arg.arg_ptr = ptr;
   PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
 }
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgTexturePtr(int32_t event_id, uint32_t binding, void* native_tex) {
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgNativeBuffer(int32_t event_id, uint32_t binding, void* native_buf) {
+  PluginEventArg arg {};
+  arg.ty = L_EVENT_ARG_TYPE_NATIVE_BUFFER;
+  arg.arg_ptr = native_buf;
+  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
+}
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgNativeTexture(int32_t event_id, uint32_t binding, void* native_tex) {
   PluginEventArg arg {};
   arg.ty = L_EVENT_ARG_TYPE_NATIVE_TEXTURE;
-  arg.arg_native_tex = native_tex;
+  arg.arg_ptr = native_tex;
   PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
 }
 
@@ -124,15 +130,20 @@ const char* PluginEventHandler::get_arg_str(uint32_t binding) const {
   assert(arg.ty == L_EVENT_ARG_TYPE_STRING);
   return arg.arg_str;
 }
+void* PluginEventHandler::get_arg_ptr(uint32_t binding) const {
+  const PluginEventArg& arg = args.at(binding);
+  assert(arg.ty == L_EVENT_ARG_TYPE_POINTER);
+  return arg.arg_ptr;
+}
 void* PluginEventHandler::get_arg_native_buf(uint32_t binding) const {
   const PluginEventArg& arg = args.at(binding);
   assert(arg.ty == L_EVENT_ARG_TYPE_NATIVE_BUFFER);
-  return arg.arg_native_buf;
+  return arg.arg_ptr;
 }
 void* PluginEventHandler::get_arg_native_tex(uint32_t binding) const {
   const PluginEventArg& arg = args.at(binding);
   assert(arg.ty == L_EVENT_ARG_TYPE_NATIVE_TEXTURE);
-  return arg.arg_native_tex;
+  return arg.arg_ptr;
 }
 
 
