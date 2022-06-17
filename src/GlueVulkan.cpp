@@ -2,35 +2,44 @@
 #include <vector>
 #include <map>
 #include "Glue/GlueVulkan.h"
+#include "taichi/taichi_vulkan.h"
 
 
-
-IUnityGraphicsVulkan* UNITY_GRAPHICS_VULKAN;
-
-
-
-PluginEventHandlerVulkan::PluginEventHandlerVulkan(uint32_t narg) :
-  PluginEventHandler(kUnityGfxRendererVulkan, narg) {}
-
-UnityVulkanBuffer PluginEventHandlerVulkan::get_arg_buf(uint32_t binding) const {
-  UnityVulkanBuffer out;
-  UNITY_GRAPHICS_VULKAN->AccessBuffer(get_arg_native_buf(binding), 0, 0, kUnityVulkanResourceAccess_ObserveOnly, &out);
-  return out;
-}
-UnityVulkanImage PluginEventHandlerVulkan::get_arg_tex(uint32_t binding) const {
-  UnityVulkanImage out;
-  UNITY_GRAPHICS_VULKAN->AccessTexture(get_arg_native_tex(binding), nullptr, VK_IMAGE_LAYOUT_UNDEFINED, 0, 0, kUnityVulkanResourceAccess_ObserveOnly, &out);
-  return out;
+PluginInstanceVulkan::PluginInstanceVulkan(IUnityGraphicsVulkan* unity_vulkan) :
+  unity_vulkan(unity_vulkan) {}
+PluginInstanceVulkan::~PluginInstanceVulkan() {
 }
 
-void InitializeGfxDeviceVulkan() {
-  UNITY_GRAPHICS_VULKAN = UNITY_INTERFACES->Get<IUnityGraphicsVulkan>();
-  const PluginEventRegistryVulkan& reg = PluginEventRegistryVulkan::get_inst();
-  for (const auto& pair : reg.event_handlers) {
-    UnityVulkanPluginEventConfig cfg = pair.second->cfg();
-    UNITY_GRAPHICS_VULKAN->ConfigureEvent(pair.first, &cfg);
-  }
+void PluginInstanceVulkan::record_submit(TiRuntime runtime) {
+  submit_args.push(runtime);
 }
-void ShutdownGfxDeviceVulkan() {
-  UNITY_GRAPHICS_VULKAN = nullptr;
+void PluginInstanceVulkan::apply_submit() {
+  TiRuntime runtime = submit_args.front();
+  submit_args.pop();
+  ti_submit(runtime);
+  ti_wait(runtime);
+}
+TiRuntime PluginInstanceVulkan::import_native_runtime() const {
+  UnityVulkanInstance unity_vulkan_instance = unity_vulkan->Instance();
+
+  TiVulkanRuntimeInteropInfo vrii {};
+  vrii.api_version = VK_API_VERSION_1_0;
+  vrii.instance = unity_vulkan_instance.instance;
+  vrii.physical_device = unity_vulkan_instance.physicalDevice;
+  vrii.device = unity_vulkan_instance.device;
+  vrii.compute_queue = unity_vulkan_instance.graphicsQueue;
+  vrii.compute_queue_family_index = unity_vulkan_instance.queueFamilyIndex;
+  vrii.graphics_queue = unity_vulkan_instance.graphicsQueue;
+  vrii.graphics_queue_family_index = unity_vulkan_instance.queueFamilyIndex;
+  return ti_import_vulkan_runtime(&vrii);
+}
+TiMemory PluginInstanceVulkan::import_native_memory(TiRuntime runtime, void* native_buffer_ptr) const {
+  UnityVulkanBuffer unity_vulkan_buffer;
+  unity_vulkan->AccessBuffer(native_buffer_ptr, 0, 0, kUnityVulkanResourceAccess_ObserveOnly, &unity_vulkan_buffer);
+
+  TiVulkanMemoryInteropInfo vmii {};
+  vmii.buffer = unity_vulkan_buffer.buffer;
+  vmii.size = unity_vulkan_buffer.sizeInBytes;
+  vmii.usage = unity_vulkan_buffer.usage;
+  return ti_import_vulkan_memory(runtime, &vmii);
 }

@@ -2,26 +2,33 @@
 #include "Glue/Glue.h"
 #include "Glue/GlueVulkan.h"
 
-
-
 IUnityInterfaces* UNITY_INTERFACES;
 IUnityGraphics* UNITY_GRAPHICS;
-UnityGfxRenderer CURRENT_RENDERER = kUnityGfxRendererNull;
+PluginInstance* INSTANCE;
 
-
+PluginInstance::PluginInstance() {}
+PluginInstance::~PluginInstance() {}
 
 void UNITY_INTERFACE_API OnGfxDeviceEvent(UnityGfxDeviceEventType eventType) {
   switch (eventType) {
   case kUnityGfxDeviceEventInitialize:
   {
-    extern void InitializeGfxDevice();
-    InitializeGfxDevice();
+    UnityGfxRenderer renderer = UNITY_GRAPHICS->GetRenderer();
+    switch (renderer) {
+    case kUnityGfxRendererVulkan:
+    {
+      IUnityGraphicsVulkan* unity_graphics_vulkan = UNITY_INTERFACES->Get<IUnityGraphicsVulkan>();
+      INSTANCE = new PluginInstanceVulkan(unity_graphics_vulkan);
+      break;
+    }
+    //default: assert(false);
+    }
     break;
   }
   case kUnityGfxDeviceEventShutdown:
   {
-    extern void ShutdownGfxDevice();
-    ShutdownGfxDevice();
+    delete INSTANCE;
+    INSTANCE = nullptr;
     break;
   }
   }
@@ -29,9 +36,9 @@ void UNITY_INTERFACE_API OnGfxDeviceEvent(UnityGfxDeviceEventType eventType) {
 
 void LoadPlugin(IUnityInterfaces* interfaces) {
   UNITY_INTERFACES = interfaces;
-  UNITY_GRAPHICS = UNITY_INTERFACES->Get<IUnityGraphics>();
-  UNITY_GRAPHICS->RegisterDeviceEventCallback(OnGfxDeviceEvent);
+  UNITY_GRAPHICS = interfaces->Get<IUnityGraphics>();
 
+  UNITY_GRAPHICS->RegisterDeviceEventCallback(OnGfxDeviceEvent);
   OnGfxDeviceEvent(kUnityGfxDeviceEventInitialize);
 }
 void UnloadPlugin() {
@@ -40,6 +47,10 @@ void UnloadPlugin() {
   UNITY_INTERFACES = nullptr;
 }
 
+
+
+// -----------------------------------------------------------------------------
+
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces * interfaces) {
   LoadPlugin(interfaces);
 }
@@ -47,108 +58,16 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
   UnloadPlugin();
 }
 
-
-
-void InitializeGfxDevice() {
-  CURRENT_RENDERER = UNITY_GRAPHICS->GetRenderer();
-  switch (CURRENT_RENDERER) {
-  case kUnityGfxRendererVulkan: InitializeGfxDeviceVulkan(); break;
-  //default: assert(false);
-  }
+void UNITY_INTERFACE_API tix_submit_in_render_thread_unity_impl(int32_t event_id) {
+  INSTANCE->apply_submit();
 }
-void UNITY_INTERFACE_API HandleGfxEvent(int32_t event_id) {
-  switch (CURRENT_RENDERER) {
-  case kUnityGfxRendererVulkan: PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->handle(); break;
-  //default: assert(false);
-  }
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_submit_in_render_thread_unity(TiRuntime runtime) {
+  INSTANCE->record_submit(runtime);
+  return tix_submit_in_render_thread_unity_impl;
 }
-void ShutdownGfxDevice() {
-  switch (CURRENT_RENDERER) {
-  case kUnityGfxRendererVulkan: ShutdownGfxDeviceVulkan(); break;
-  //default: assert(false);
-  }
+extern "C" TiRuntime UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_import_native_runtime_unity() {
+  return INSTANCE->import_native_runtime();
 }
-
-extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungGetPluginGfxEventHandlers() {
-  return HandleGfxEvent;
-}
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgI32(int32_t event_id, uint32_t binding, int32_t value) {
-  PluginEventArg arg {};
-  arg.ty = L_EVENT_ARG_TYPE_I32;
-  arg.arg_i32 = value;
-  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
-}
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgF32(int32_t event_id, uint32_t binding, float value) {
-  PluginEventArg arg {};
-  arg.ty = L_EVENT_ARG_TYPE_F32;
-  arg.arg_f32 = value;
-  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
-}
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgString(int32_t event_id, uint32_t binding, const char* str) {
-  PluginEventArg arg {};
-  arg.ty = L_EVENT_ARG_TYPE_STRING;
-  arg.arg_str = str;
-  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
-}
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgPointer(int32_t event_id, uint32_t binding, void* ptr) {
-  PluginEventArg arg {};
-  arg.ty = L_EVENT_ARG_TYPE_POINTER;
-  arg.arg_ptr = ptr;
-  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
-}
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgNativeBuffer(int32_t event_id, uint32_t binding, void* native_buf) {
-  PluginEventArg arg {};
-  arg.ty = L_EVENT_ARG_TYPE_NATIVE_BUFFER;
-  arg.arg_ptr = native_buf;
-  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
-}
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungBindGfxEventArgNativeTexture(int32_t event_id, uint32_t binding, void* native_tex) {
-  PluginEventArg arg {};
-  arg.ty = L_EVENT_ARG_TYPE_NATIVE_TEXTURE;
-  arg.arg_ptr = native_tex;
-  PluginEventRegistryVulkan::get_inst().event_handlers.at(event_id)->bind_arg(binding, std::move(arg));
-}
-
-PluginEventHandler::PluginEventHandler(UnityGfxRenderer renderer, uint32_t narg) : renderer(renderer) {
-  args.resize(narg);
-}
-void PluginEventHandler::bind_arg(uint32_t binding, PluginEventArg&& arg) {
-  args.at(binding) = std::forward<PluginEventArg>(arg);
-}
-int32_t PluginEventHandler::get_arg_i32(uint32_t binding) const {
-  const PluginEventArg& arg = args.at(binding);
-  assert(arg.ty == L_EVENT_ARG_TYPE_I32);
-  return arg.arg_i32;
-}
-float PluginEventHandler::get_arg_f32(uint32_t binding) const {
-  const PluginEventArg& arg = args.at(binding);
-  assert(arg.ty == L_EVENT_ARG_TYPE_F32);
-  return arg.arg_f32;
-}
-const char* PluginEventHandler::get_arg_str(uint32_t binding) const {
-  const PluginEventArg& arg = args.at(binding);
-  assert(arg.ty == L_EVENT_ARG_TYPE_STRING);
-  return arg.arg_str;
-}
-void* PluginEventHandler::get_arg_ptr(uint32_t binding) const {
-  const PluginEventArg& arg = args.at(binding);
-  assert(arg.ty == L_EVENT_ARG_TYPE_POINTER);
-  return arg.arg_ptr;
-}
-void* PluginEventHandler::get_arg_native_buf(uint32_t binding) const {
-  const PluginEventArg& arg = args.at(binding);
-  assert(arg.ty == L_EVENT_ARG_TYPE_NATIVE_BUFFER);
-  return arg.arg_ptr;
-}
-void* PluginEventHandler::get_arg_native_tex(uint32_t binding) const {
-  const PluginEventArg& arg = args.at(binding);
-  assert(arg.ty == L_EVENT_ARG_TYPE_NATIVE_TEXTURE);
-  return arg.arg_ptr;
-}
-
-
-
-int32_t LAST_ERROR = 0;
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ungGetLastError() {
-  return LAST_ERROR;
+extern "C" TiMemory UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_import_native_memory_unity(TiRuntime runtime, void* native_buffer_ptr) {
+  return INSTANCE->import_native_memory(runtime, native_buffer_ptr);
 }
