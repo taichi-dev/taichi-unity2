@@ -1,7 +1,7 @@
 #include <cassert>
 #include <vector>
 #include <map>
-#include "Glue/GlueVulkan.h"
+#include "taichi/taichi_unity.vulkan.h"
 #include "taichi/taichi_vulkan.h"
 
 
@@ -10,15 +10,6 @@ PluginInstanceVulkan::PluginInstanceVulkan(IUnityGraphicsVulkan* unity_vulkan) :
 PluginInstanceVulkan::~PluginInstanceVulkan() {
 }
 
-void PluginInstanceVulkan::record_submit(TiRuntime runtime) {
-  submit_args.push(runtime);
-}
-void PluginInstanceVulkan::apply_submit() {
-  TiRuntime runtime = submit_args.front();
-  submit_args.pop();
-  ti_submit(runtime);
-  ti_wait(runtime);
-}
 TiRuntime PluginInstanceVulkan::import_native_runtime() const {
   UnityVulkanInstance unity_vulkan_instance = unity_vulkan->Instance();
 
