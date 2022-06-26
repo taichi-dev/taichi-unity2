@@ -79,6 +79,37 @@ struct RenderThreadLaunchComputeGraphTask : public RenderThreadTask {
 
 };
 
+struct RenderThreadCopyMemoryToNativeTask : public RenderThreadTask {
+  TiRuntime runtime_;
+  TiMemorySlice src_;
+  void* native_buffer_ptr_;
+  uint64_t native_buffer_offset_;
+  uint64_t native_buffer_size_;
+
+  RenderThreadCopyMemoryToNativeTask(
+    TiRuntime runtime,
+    const TiMemorySlice& memory_slice,
+    void* native_buffer_ptr,
+    uint64_t native_buffer_offset,
+    uint64_t native_buffer_size
+  ) :
+    runtime_(runtime),
+    src_(memory_slice),
+    native_buffer_ptr_(native_buffer_ptr),
+    native_buffer_offset_(native_buffer_offset),
+    native_buffer_size_(native_buffer_size) {}
+
+  virtual void run_in_render_thread() override final {
+    TiMemorySlice dst {};
+    dst.memory = INSTANCE->import_native_memory(runtime_, native_buffer_ptr_);
+    dst.offset = native_buffer_offset_;
+    dst.size = native_buffer_size_;
+    ti_copy_memory(runtime_, &dst, &src_);
+    ti_free_memory(runtime_, dst.memory);
+  }
+
+};
+
 
 
 PluginInstance::PluginInstance() {}
@@ -201,6 +232,18 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_launch_compute_gr
   assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime);
   std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
   RUNTIME_STATE->pending_tasks.emplace_back(new RenderThreadLaunchComputeGraphTask(runtime, compute_graph, arg_count, args));
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_copy_memory_to_native_async_unity(
+  TiRuntime runtime,
+  const TiMemorySlice* memory,
+  void* native_buffer_ptr,
+  uint64_t native_buffer_offset,
+  uint64_t native_buffer_size
+) {
+  assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime && native_buffer_ptr != nullptr);
+  std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
+  RUNTIME_STATE->pending_tasks.emplace_back(new RenderThreadCopyMemoryToNativeTask(runtime, *memory, native_buffer_ptr, native_buffer_offset, native_buffer_size));
 }
 
 
