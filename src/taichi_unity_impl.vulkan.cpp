@@ -1,8 +1,8 @@
 #include <cassert>
 #include <vector>
 #include <map>
-#include "taichi/taichi_unity.vulkan.h"
-#include "taichi/taichi_vulkan.h"
+#include <taichi/taichi_vulkan.h>
+#include "taichi_unity_impl.vulkan.h"
 
 
 PluginInstanceVulkan::PluginInstanceVulkan(IUnityGraphicsVulkan* unity_vulkan) :
@@ -24,9 +24,9 @@ TiRuntime PluginInstanceVulkan::import_native_runtime() const {
   vrii.graphics_queue_family_index = unity_vulkan_instance.queueFamilyIndex;
   return ti_import_vulkan_runtime(&vrii);
 }
-TiMemory PluginInstanceVulkan::import_native_memory(TiRuntime runtime, void* native_buffer_ptr) const {
+TiMemory PluginInstanceVulkan::import_native_memory(TiRuntime runtime, TixNativeBufferUnity native_buffer) const {
   UnityVulkanBuffer unity_vulkan_buffer;
-  unity_vulkan->AccessBuffer(native_buffer_ptr, 0, 0, kUnityVulkanResourceAccess_ObserveOnly, &unity_vulkan_buffer);
+  unity_vulkan->AccessBuffer((void*)native_buffer, 0, 0, kUnityVulkanResourceAccess_ObserveOnly, &unity_vulkan_buffer);
 
   TiVulkanMemoryInteropInfo vmii {};
   vmii.buffer = unity_vulkan_buffer.buffer;

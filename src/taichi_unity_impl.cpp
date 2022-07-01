@@ -1,6 +1,6 @@
 #include <cassert>
-#include "taichi/taichi_unity.h"
-#include "taichi/taichi_unity.vulkan.h"
+#include <taichi/taichi_unity.h>
+#include "taichi_unity_impl.vulkan.h"
 
 IUnityInterfaces* UNITY_INTERFACES;
 IUnityGraphics* UNITY_GRAPHICS;
@@ -23,11 +23,16 @@ struct TaichiUnityRuntimeState {
   TiRuntime runtime;
 
   // Added by GAME THREAD; removed by RENDER THREAD.
-  std::vector<void*> pending_native_buffer_imports_;
+  std::vector<TixNativeBufferUnity> pending_native_buffer_imports_;
   std::vector<std::unique_ptr<RenderThreadTask>> pending_tasks;
 
   // Added by RENDER THREAD; removed by GAME THREAD.
-  std::map<void*, TiMemory> imported_native_buffers_;
+  std::map<TixNativeBufferUnity, TiMemory> imported_native_buffers_;
+
+  void enqueue_task(RenderThreadTask* task) {
+    std::lock_guard<std::mutex> guard(mutex);
+    pending_tasks.emplace_back(std::unique_ptr<RenderThreadTask>(task));
+  }
 };
 std::unique_ptr<TaichiUnityRuntimeState> RUNTIME_STATE;
 
@@ -82,29 +87,26 @@ struct RenderThreadLaunchComputeGraphTask : public RenderThreadTask {
 struct RenderThreadCopyMemoryToNativeTask : public RenderThreadTask {
   TiRuntime runtime_;
   TiMemorySlice src_;
-  void* native_buffer_ptr_;
-  uint64_t native_buffer_offset_;
-  uint64_t native_buffer_size_;
+  TixNativeBufferUnity dst_;
+  uint64_t dst_offset_;
 
   RenderThreadCopyMemoryToNativeTask(
     TiRuntime runtime,
-    const TiMemorySlice& memory_slice,
-    void* native_buffer_ptr,
-    uint64_t native_buffer_offset,
-    uint64_t native_buffer_size
+    const TiMemorySlice& src,
+    TixNativeBufferUnity dst,
+    uint64_t dst_offset
   ) :
     runtime_(runtime),
-    src_(memory_slice),
-    native_buffer_ptr_(native_buffer_ptr),
-    native_buffer_offset_(native_buffer_offset),
-    native_buffer_size_(native_buffer_size) {}
+    src_(src),
+    dst_(dst),
+    dst_offset_(dst_offset) {}
 
   virtual void run_in_render_thread() override final {
     TiMemorySlice dst {};
-    dst.memory = INSTANCE->import_native_memory(runtime_, native_buffer_ptr_);
-    dst.offset = native_buffer_offset_;
-    dst.size = native_buffer_size_;
-    ti_copy_memory(runtime_, &dst, &src_);
+    dst.memory = INSTANCE->import_native_memory(runtime_, dst_);
+    dst.offset = dst_offset_;
+    dst.size = src_.size;
+    ti_copy_memory_device_to_device(runtime_, &dst, &src_);
     ti_free_memory(runtime_, dst.memory);
   }
 
@@ -156,12 +158,13 @@ void UnloadPlugin() {
 
 // -----------------------------------------------------------------------------
 
+extern "C" {
 
 
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces * interfaces) {
+void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces * interfaces) {
   LoadPlugin(interfaces);
 }
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
+void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
   UnloadPlugin();
 }
 
@@ -173,9 +176,9 @@ void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
 
   std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
 
-  for (void* native_buffer_ptr : RUNTIME_STATE->pending_native_buffer_imports_) {
-    TiMemory memory = INSTANCE->import_native_memory(runtime, native_buffer_ptr);
-    RUNTIME_STATE->imported_native_buffers_.emplace(std::make_pair(native_buffer_ptr, memory));
+  for (TixNativeBufferUnity native_buffer : RUNTIME_STATE->pending_native_buffer_imports_) {
+    TiMemory memory = INSTANCE->import_native_memory(runtime, native_buffer);
+    RUNTIME_STATE->imported_native_buffers_.emplace(std::make_pair(native_buffer, memory));
   }
   RUNTIME_STATE->pending_native_buffer_imports_.clear();
 
@@ -190,7 +193,8 @@ void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
 
 
 
-extern "C" TiRuntime UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_import_native_runtime_unity() {
+// Import unity runtime. The arch of runtime depends on what Unity provided.
+TI_DLL_EXPORT TiRuntime TI_API_CALL tix_import_native_runtime_unity() {
   assert(INSTANCE != nullptr);
   TiRuntime runtime = INSTANCE->import_native_runtime();
   RUNTIME_STATE = std::make_unique<TaichiUnityRuntimeState>();
@@ -198,55 +202,67 @@ extern "C" TiRuntime UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_import_nativ
   return runtime;
 }
 
-extern "C" TiMemory UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_import_native_memory_async_unity(TiRuntime runtime, void* native_buffer_ptr) {
-  assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime);
-  std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
-  auto it = RUNTIME_STATE->imported_native_buffers_.find(native_buffer_ptr);
-  if (it != RUNTIME_STATE->imported_native_buffers_.end()) {
-    TiMemory memory = it->second;
-    RUNTIME_STATE->imported_native_buffers_.erase(it);
-    return memory;
-  } else {
-    RUNTIME_STATE->pending_native_buffer_imports_.emplace_back(native_buffer_ptr);
-    return TI_NULL_HANDLE;
-  }
-
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_launch_kernel_async_unity(
+// Same as `ti_launch_kernel` and `ti_launch_compute_graph` but `TiMemory` MUST
+// come from `tix_import_native_memory_unity`.
+TI_DLL_EXPORT void TI_API_CALL tix_launch_kernel_async_unity(
   TiRuntime runtime,
   TiKernel kernel,
   uint32_t arg_count,
   const TiArgument* args
 ) {
   assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime);
-  std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
-  RUNTIME_STATE->pending_tasks.emplace_back(new RenderThreadLaunchKenelTask(runtime, kernel, arg_count, args));
+  RUNTIME_STATE->enqueue_task(new RenderThreadLaunchKenelTask(runtime, kernel, arg_count, args));
 }
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_launch_compute_graph_async_unity(
+TI_DLL_EXPORT void TI_API_CALL tix_launch_compute_graph_async_unity(
   TiRuntime runtime,
   TiComputeGraph compute_graph,
   uint32_t arg_count,
   const TiNamedArgument* args
 ) {
   assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime);
-  std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
-  RUNTIME_STATE->pending_tasks.emplace_back(new RenderThreadLaunchComputeGraphTask(runtime, compute_graph, arg_count, args));
+  RUNTIME_STATE->enqueue_task(new RenderThreadLaunchComputeGraphTask(runtime, compute_graph, arg_count, args));
 }
 
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_copy_memory_to_native_async_unity(
+TI_DLL_EXPORT void TI_API_CALL tix_copy_memory_to_native_buffer_async_unity(
   TiRuntime runtime,
-  const TiMemorySlice* memory,
-  void* native_buffer_ptr,
-  uint64_t native_buffer_offset,
-  uint64_t native_buffer_size
+  TixNativeBufferUnity dst,
+  uint64_t dst_offset,
+  const TiMemorySlice* src
 ) {
-  assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime && native_buffer_ptr != nullptr);
-  std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
-  RUNTIME_STATE->pending_tasks.emplace_back(new RenderThreadCopyMemoryToNativeTask(runtime, *memory, native_buffer_ptr, native_buffer_offset, native_buffer_size));
+  assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime && dst != nullptr && src != nullptr);
+  RUNTIME_STATE->enqueue_task(new RenderThreadCopyMemoryToNativeTask(runtime, *src, dst, dst_offset));
+}
+
+TI_DLL_EXPORT void TI_API_CALL tix_copy_memory_device_to_host_unity(
+  TiRuntime runtime,
+  void* dst,
+  uint64_t dst_offset,
+  const TiMemorySlice* src
+) {
+  assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime && dst != nullptr && src != nullptr);
+  void* mapped = ti_map_memory(runtime, src->memory);
+  std::memcpy((uint8_t*)dst + dst_offset, mapped, src->size);
+  ti_unmap_memory(runtime, src->memory);
+}
+
+TI_DLL_EXPORT void TI_API_CALL tix_copy_memory_host_to_device_unity(
+  TiRuntime runtime,
+  const TiMemorySlice* dst,
+  const void* src,
+  uint64_t src_offset
+) {
+  assert(RUNTIME_STATE != nullptr && runtime == RUNTIME_STATE->runtime && dst != nullptr && src != nullptr);
+  void* mapped = ti_map_memory(runtime, dst->memory);
+  std::memcpy(mapped, (const uint8_t*)src + src_offset, dst->size);
+  ti_unmap_memory(runtime, dst->memory);
 }
 
 
-extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API tix_submit_in_render_thread_unity(TiRuntime runtime) {
-  return tix_render_thread_main;
+// Unity graphics event invocation can run our code in the rendering thread
+// Note that submitting commands simultaneously to a same queue is not allowed
+// by any graphics API.
+ TI_DLL_EXPORT void* TI_API_CALL tix_submit_async_unity(TiRuntime runtime) {
+  return (void*)(&tix_render_thread_main);
 }
+
+} // extern "C"
