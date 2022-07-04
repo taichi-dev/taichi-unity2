@@ -18,7 +18,7 @@ endif()
 
 find_package(Vulkan REQUIRED)
 
-set(TAICHI_C_API_INSTALL_DIR $ENV{TAICHI_REPO_DIR} CACHE PATH "path to taichi c-api installation directory")
+set(TAICHI_C_API_INSTALL_DIR $ENV{TAICHI_REPO_DIR}/_skbuild/win-amd64-3.8/cmake-install/c_api CACHE PATH "path to taichi c-api installation directory")
 
 find_library(taichi_c_api taichi_c_api HINTS ${TAICHI_C_API_INSTALL_DIR}/lib REQUIRED)
 
