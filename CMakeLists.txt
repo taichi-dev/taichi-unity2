@@ -29,6 +29,7 @@ set(INC_DIRS
 )
 set(LINK_LIBS
     ${taichi_c_api}
+    ${Vulkan_LIBRARY}
 )
 
 include_directories(${INC_DIRS})
