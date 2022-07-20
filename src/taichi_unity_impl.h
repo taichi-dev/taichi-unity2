@@ -18,8 +18,8 @@ struct PluginInstance {
   virtual ~PluginInstance();
 
   virtual TiRuntime import_native_runtime() const = 0;
-
   virtual TiMemory import_native_memory(TiRuntime runtime, TixNativeBufferUnity native_buffer_ptr) const = 0;
+  virtual void wait_and_reset_event(TiRuntime runtime, TiEvent event) const = 0;
 };
 
 

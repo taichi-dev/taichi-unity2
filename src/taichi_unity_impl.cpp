@@ -1,5 +1,6 @@
 #include <cassert>
 #include <taichi/taichi_unity.h>
+#include <taichi/taichi_vulkan.h>
 #include "taichi_unity_impl.vulkan.h"
 
 IUnityInterfaces* UNITY_INTERFACES;
@@ -21,6 +22,8 @@ struct TaichiUnityRuntimeState {
   std::mutex mutex;
 
   TiRuntime runtime;
+  // Signaled after Taichi, reset by Unity.
+  TiEvent event;
 
   // Added by GAME THREAD; removed by RENDER THREAD.
   std::vector<TixNativeBufferUnity> pending_native_buffer_imports_;
@@ -173,7 +176,6 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
 void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
   if (INSTANCE == nullptr || RUNTIME_STATE == nullptr) { return; }
   TiRuntime runtime = RUNTIME_STATE->runtime;
-
   std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
 
   for (TixNativeBufferUnity native_buffer : RUNTIME_STATE->pending_native_buffer_imports_) {
@@ -187,8 +189,12 @@ void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
   }
   RUNTIME_STATE->pending_tasks.clear();
 
+  // Signal the event after all Taichi tasks.
+  ti_signal_event(runtime, RUNTIME_STATE->event);
   ti_submit(runtime);
-  ti_wait(runtime);
+
+  // Wait on and reset the event in Unity's command buffer.
+  INSTANCE->wait_and_reset_event(runtime, RUNTIME_STATE->event);
 }
 
 
@@ -199,6 +205,7 @@ TI_DLL_EXPORT TiRuntime TI_API_CALL tix_import_native_runtime_unity() {
   TiRuntime runtime = INSTANCE->import_native_runtime();
   RUNTIME_STATE = std::make_unique<TaichiUnityRuntimeState>();
   RUNTIME_STATE->runtime = runtime;
+  RUNTIME_STATE->event = ti_create_event(runtime);
   return runtime;
 }
 

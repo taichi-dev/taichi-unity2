@@ -3,10 +3,16 @@
 #include <map>
 #include <taichi/taichi_vulkan.h>
 #include "taichi_unity_impl.vulkan.h"
-
+#include "Unity/IUnityGraphicsVulkan.h"
 
 PluginInstanceVulkan::PluginInstanceVulkan(IUnityGraphicsVulkan* unity_vulkan) :
-  unity_vulkan(unity_vulkan) {}
+  unity_vulkan(unity_vulkan)
+{
+  UnityVulkanInstance unity_vulkan_instance = unity_vulkan->Instance();
+
+  vkCmdResetEvent = PFN_vkCmdResetEvent(vkGetDeviceProcAddr(unity_vulkan_instance.device, "vkCmdResetEvent"));
+  vkCmdWaitEvents = PFN_vkCmdWaitEvents(vkGetDeviceProcAddr(unity_vulkan_instance.device, "vkCmdWaitEvents"));
+}
 PluginInstanceVulkan::~PluginInstanceVulkan() {
 }
 
@@ -33,4 +39,20 @@ TiMemory PluginInstanceVulkan::import_native_memory(TiRuntime runtime, TixNative
   vmii.size = unity_vulkan_buffer.sizeInBytes;
   vmii.usage = unity_vulkan_buffer.usage;
   return ti_import_vulkan_memory(runtime, &vmii);
+}
+void PluginInstanceVulkan::wait_and_reset_event(TiRuntime runtime, TiEvent event) const {
+  TiVulkanEventInteropInfo interop_info {};
+  ti_export_vulkan_event(runtime, event, &interop_info);
+
+  UnityVulkanRecordingState recording_state {};
+  if (!unity_vulkan->CommandRecordingState(&recording_state, kUnityVulkanGraphicsQueueAccess_DontCare)) {
+    return;
+  }
+  if (recording_state.commandBuffer != nullptr) {
+    //assert(recording_state.commandBufferLevel == VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    vkCmdWaitEvents(recording_state.commandBuffer, 1, &interop_info.event,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+      0, nullptr, 0, nullptr, 0, nullptr);
+    vkCmdResetEvent(recording_state.commandBuffer, interop_info.event, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+  }
 }
