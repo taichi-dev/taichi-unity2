@@ -25,7 +25,7 @@ if (ANDROID)
     list(APPEND CMAKE_FIND_ROOT_PATH ${TAICHI_C_API_INSTALL_DIR}/lib)
 endif()
 
-find_library(taichi_c_api taichi_c_api HINTS ${TAICHI_C_API_INSTALL_DIR}/lib REQUIRED)
+find_library(taichi_c_api taichi_c_api HINTS ${TAICHI_C_API_INSTALL_DIR}/lib REQUIRED NO_CMAKE_FIND_ROOT_PATH)
 
 set(INC_DIRS
     ${PROJECT_SOURCE_DIR}/include
