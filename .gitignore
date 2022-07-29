@@ -14,3 +14,4 @@ local.properties
 out
 bin
 CMakeSettings.json
+/build*/
