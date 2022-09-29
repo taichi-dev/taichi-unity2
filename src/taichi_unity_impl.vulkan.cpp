@@ -1,9 +1,6 @@
 #include <cassert>
 #include <vector>
 #include <map>
-#ifndef VK_NO_PROTOTYPES
-#define VK_NO_PROTOTYPES 0
-#endif // VK_NO_PROTOTYPES
 #include <vulkan/vulkan.h>
 #include <taichi/taichi_vulkan.h>
 #include "taichi_unity_impl.vulkan.h"
