@@ -1,6 +1,8 @@
 #include <cassert>
 #include <vector>
 #include <map>
+#define VK_NO_PROTOTYPES 1
+#include <vulkan/vulkan.h>
 #include <taichi/taichi_vulkan.h>
 #include "taichi_unity_impl.vulkan.h"
 #include "Unity/IUnityGraphicsVulkan.h"
