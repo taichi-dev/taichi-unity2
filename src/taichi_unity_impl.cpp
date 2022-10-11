@@ -1,6 +1,4 @@
 #include <cassert>
-#include <taichi/taichi_unity.h>
-#include <taichi/taichi_vulkan.h>
 #include "taichi_unity_impl.vulkan.h"
 
 IUnityInterfaces* UNITY_INTERFACES;
