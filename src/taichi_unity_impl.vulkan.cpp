@@ -1,8 +1,6 @@
 #include <cassert>
 #include <vector>
 #include <map>
-#include <vulkan/vulkan.h>
-#include <taichi/taichi_vulkan.h>
 #include "taichi_unity_impl.vulkan.h"
 #include "Unity/IUnityGraphicsVulkan.h"
 
@@ -10,9 +8,11 @@ PluginInstanceVulkan::PluginInstanceVulkan(IUnityGraphicsVulkan* unity_vulkan) :
   unity_vulkan(unity_vulkan)
 {
   UnityVulkanInstance unity_vulkan_instance = unity_vulkan->Instance();
+  PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr_ = unity_vulkan_instance.getInstanceProcAddr;
+  PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr_ = PFN_vkGetDeviceProcAddr(vkGetInstanceProcAddr_(unity_vulkan_instance.instance, "vkGetDeviceProcAddr"));
 
-  vkCmdResetEvent = PFN_vkCmdResetEvent(vkGetDeviceProcAddr(unity_vulkan_instance.device, "vkCmdResetEvent"));
-  vkCmdWaitEvents = PFN_vkCmdWaitEvents(vkGetDeviceProcAddr(unity_vulkan_instance.device, "vkCmdWaitEvents"));
+  vkCmdResetEvent = PFN_vkCmdResetEvent(vkGetDeviceProcAddr_(unity_vulkan_instance.device, "vkCmdResetEvent"));
+  vkCmdWaitEvents = PFN_vkCmdWaitEvents(vkGetDeviceProcAddr_(unity_vulkan_instance.device, "vkCmdWaitEvents"));
 }
 PluginInstanceVulkan::~PluginInstanceVulkan() {
 }
