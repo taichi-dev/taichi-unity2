@@ -272,7 +272,8 @@ TI_DLL_EXPORT void TI_API_CALL tix_copy_memory_host_to_device_unity(
 // Unity graphics event invocation can run our code in the rendering thread
 // Note that submitting commands simultaneously to a same queue is not allowed
 // by any graphics API.
- TI_DLL_EXPORT void* TI_API_CALL tix_submit_async_unity(TiRuntime runtime) {
+TI_DLL_EXPORT void* TI_API_CALL tix_submit_async_unity(TiRuntime runtime) {
+  ti_wait(runtime);
   return (void*)(&tix_render_thread_main);
 }
 
