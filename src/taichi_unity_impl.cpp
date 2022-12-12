@@ -174,23 +174,18 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
 void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
   if (INSTANCE == nullptr || RUNTIME_STATE == nullptr) { return; }
   TiRuntime runtime = RUNTIME_STATE->runtime;
+  std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
 
-  std::vector<TixNativeBufferUnity> pending_native_buffer_imports;
-  std::vector<std::unique_ptr<RenderThreadTask>> pending_tasks;
-  {
-    std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
-    pending_native_buffer_imports = std::move(RUNTIME_STATE->pending_native_buffer_imports_);
-    pending_tasks = std::move(RUNTIME_STATE->pending_tasks);
-  }
-
-  for (TixNativeBufferUnity native_buffer : pending_native_buffer_imports) {
+  for (TixNativeBufferUnity native_buffer : RUNTIME_STATE->pending_native_buffer_imports_) {
     TiMemory memory = INSTANCE->import_native_memory(runtime, native_buffer);
     RUNTIME_STATE->imported_native_buffers_.emplace(std::make_pair(native_buffer, memory));
   }
+  RUNTIME_STATE->pending_native_buffer_imports_.clear();
 
-  for (const auto& pending_task : pending_tasks) {
+  for (const auto& pending_task : RUNTIME_STATE->pending_tasks) {
     pending_task->run_in_render_thread();
   }
+  RUNTIME_STATE->pending_tasks.clear();
 
   // Signal the event after all Taichi tasks.
   ti_signal_event(runtime, RUNTIME_STATE->event);
@@ -199,7 +194,6 @@ void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
   // Wait on and reset the event in Unity's command buffer.
   INSTANCE->wait_and_reset_event(runtime, RUNTIME_STATE->event);
 }
-
 
 
 
@@ -272,8 +266,7 @@ TI_DLL_EXPORT void TI_API_CALL tix_copy_memory_host_to_device_unity(
 // Unity graphics event invocation can run our code in the rendering thread
 // Note that submitting commands simultaneously to a same queue is not allowed
 // by any graphics API.
-TI_DLL_EXPORT void* TI_API_CALL tix_submit_async_unity(TiRuntime runtime) {
-  ti_wait(runtime);
+ TI_DLL_EXPORT void* TI_API_CALL tix_submit_async_unity(TiRuntime runtime) {
   return (void*)(&tix_render_thread_main);
 }
 
