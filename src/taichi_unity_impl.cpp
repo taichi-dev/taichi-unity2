@@ -20,19 +20,17 @@ struct TaichiUnityRuntimeState {
   std::mutex mutex;
 
   TiRuntime runtime;
-  // Signaled after Taichi, reset by Unity.
-  TiEvent event;
 
   // Added by GAME THREAD; removed by RENDER THREAD.
   std::vector<TixNativeBufferUnity> pending_native_buffer_imports_;
-  std::vector<std::unique_ptr<RenderThreadTask>> pending_tasks;
+  std::vector<std::unique_ptr<RenderThreadTask>> pending_tasks_;
 
   // Added by RENDER THREAD; removed by GAME THREAD.
   std::map<TixNativeBufferUnity, TiMemory> imported_native_buffers_;
 
   void enqueue_task(RenderThreadTask* task) {
     std::lock_guard<std::mutex> guard(mutex);
-    pending_tasks.emplace_back(std::unique_ptr<RenderThreadTask>(task));
+    pending_tasks_.emplace_back(std::unique_ptr<RenderThreadTask>(task));
   }
 };
 std::unique_ptr<TaichiUnityRuntimeState> RUNTIME_STATE;
@@ -173,26 +171,29 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
 
 void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
   if (INSTANCE == nullptr || RUNTIME_STATE == nullptr) { return; }
-  TiRuntime runtime = RUNTIME_STATE->runtime;
-  std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
 
-  for (TixNativeBufferUnity native_buffer : RUNTIME_STATE->pending_native_buffer_imports_) {
+  TiRuntime runtime = RUNTIME_STATE->runtime;
+  std::vector<TixNativeBufferUnity> pending_native_buffer_imports;
+  std::vector<std::unique_ptr<RenderThreadTask>> pending_tasks;
+
+  {
+    std::lock_guard<std::mutex> guard(RUNTIME_STATE->mutex);
+    pending_native_buffer_imports = std::move(RUNTIME_STATE->pending_native_buffer_imports_);
+    pending_tasks = std::move(RUNTIME_STATE->pending_tasks_);
+  }
+
+  for (TixNativeBufferUnity native_buffer : pending_native_buffer_imports) {
     TiMemory memory = INSTANCE->import_native_memory(runtime, native_buffer);
     RUNTIME_STATE->imported_native_buffers_.emplace(std::make_pair(native_buffer, memory));
   }
-  RUNTIME_STATE->pending_native_buffer_imports_.clear();
 
-  for (const auto& pending_task : RUNTIME_STATE->pending_tasks) {
+  for (const auto& pending_task : pending_tasks) {
     pending_task->run_in_render_thread();
   }
-  RUNTIME_STATE->pending_tasks.clear();
 
-  // Signal the event after all Taichi tasks.
-  ti_signal_event(runtime, RUNTIME_STATE->event);
-  ti_submit(runtime);
-
-  // Wait on and reset the event in Unity's command buffer.
-  INSTANCE->wait_and_reset_event(runtime, RUNTIME_STATE->event);
+  // Force synchronize to ensure everything is done when we give control back to
+  // Unity.
+  ti_wait(runtime);
 }
 
 
@@ -203,7 +204,6 @@ TI_DLL_EXPORT TiRuntime TI_API_CALL tix_import_native_runtime_unity() {
   TiRuntime runtime = INSTANCE->import_native_runtime();
   RUNTIME_STATE = std::make_unique<TaichiUnityRuntimeState>();
   RUNTIME_STATE->runtime = runtime;
-  RUNTIME_STATE->event = ti_create_event(runtime);
   return runtime;
 }
 
