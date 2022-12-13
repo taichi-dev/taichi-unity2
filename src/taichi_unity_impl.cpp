@@ -1,5 +1,5 @@
 #include <cassert>
-#include <memory>
+#include <cstring>
 
 #include "taichi_unity_impl.vulkan.h"
 
