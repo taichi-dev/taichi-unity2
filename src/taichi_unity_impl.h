@@ -7,6 +7,7 @@
 #include <mutex>
 #include "Unity/IUnityInterface.h"
 #include "Unity/IUnityGraphics.h"
+#include <vulkan/vulkan.h>
 #define TI_WITH_VULKAN 1
 #include <taichi/taichi.h>
 #include <taichi/taichi_unity.h>
