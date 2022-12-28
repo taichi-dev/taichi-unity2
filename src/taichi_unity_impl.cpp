@@ -39,6 +39,18 @@ struct TaichiUnityRuntimeState {
 };
 std::unique_ptr<TaichiUnityRuntimeState> RUNTIME_STATE;
 
+struct RenderThreadUserTask : public RenderThreadTask {
+  void* user_data_;
+  TixAsyncTaskUnity async_task_;
+
+  RenderThreadUserTask(void* user_data, TixAsyncTaskUnity async_task) :
+      user_data_(user_data), async_task_(async_task) {}
+
+  virtual void run_in_render_thread() override final {
+    async_task_(user_data_);
+  }
+};
+
 struct RenderThreadLaunchKenelTask : public RenderThreadTask {
   TiRuntime runtime_;
   TiKernel kernel_;
@@ -219,6 +231,11 @@ TI_DLL_EXPORT TiRuntime TI_API_CALL tix_import_native_runtime_unity() {
   RUNTIME_STATE = std::make_unique<TaichiUnityRuntimeState>();
   RUNTIME_STATE->runtime = runtime;
   return runtime;
+}
+
+TI_DLL_EXPORT void TI_API_CALL
+tix_enqueue_task_async_unity(void *user_data, TixAsyncTaskUnity async_task) {
+  RUNTIME_STATE->enqueue_task(new RenderThreadUserTask(user_data, async_task));
 }
 
 // Same as `ti_launch_kernel` and `ti_launch_compute_graph` but `TiMemory` MUST
