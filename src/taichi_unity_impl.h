@@ -8,17 +8,17 @@
 #include "Unity/IUnityInterface.h"
 #include "Unity/IUnityGraphics.h"
 #include <vulkan/vulkan.h>
-#define TI_WITH_VULKAN 1
 #include <taichi/taichi.h>
 #include <taichi/taichi_unity.h>
 
-extern IUnityInterfaces* UNITY_INTERFACE;
+extern IUnityInterfaces* UNITY_INTERFACES;
 extern IUnityGraphics* UNITY_GRAPHICS;
 
 struct PluginInstance {
   PluginInstance();
   virtual ~PluginInstance();
 
+  virtual void render_thread_prelude() const {}
   virtual TiRuntime import_native_runtime() const = 0;
   virtual TiMemory import_native_memory(TiRuntime runtime, TixNativeBufferUnity native_buffer_ptr) const = 0;
 };
