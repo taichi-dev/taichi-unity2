@@ -20,18 +20,17 @@ TiRuntime PluginInstanceMetal::import_native_runtime() const {
   NSBundle *bundle = unity_metal->MetalBundle();
   id<MTLDevice> mtl_device = unity_metal->MetalDevice();
 
-  TiMetalRuntimeInteropInfoExt mrii {};
-  mrii.bundle = (__bridge TiNsBundleExt)bundle;
-  mrii.device = (__bridge TiMtlDeviceExt)mtl_device;
-  return ti_import_metal_runtime_ext(&mrii);
+  TiMetalRuntimeInteropInfo mrii {};
+  mrii.bundle = (__bridge TiNsBundle)bundle;
+  mrii.device = (__bridge TiMtlDevice)mtl_device;
+  return ti_import_metal_runtime(&mrii);
 }
 TiMemory PluginInstanceMetal::import_native_memory(TiRuntime runtime, TixNativeBufferUnity native_buffer) const {
   id<MTLBuffer> mtl_buffer = (__bridge id<MTLBuffer>)native_buffer;
 
-  TiMetalMemoryInteropInfoExt vmii {};
-  vmii.buffer = (__bridge TiMtlBufferExt)mtl_buffer;
-  vmii.size = mtl_buffer.length;
-  return ti_import_metal_memory_ext(runtime, &vmii);
+  TiMetalMemoryInteropInfo vmii {};
+  vmii.buffer = (__bridge TiMtlBuffer)mtl_buffer;
+  return ti_import_metal_memory(runtime, &vmii);
 }
 
 #endif // TI_WITH_METAL

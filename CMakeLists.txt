@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required(VERSION 3.15)
 
-project(taichi_unity LANGUAGES C CXX OBJC OBJCXX)
+project(taichi_unity LANGUAGES C CXX)
 
 option(TAICHI_UNITY_BUILD_STATIC "Build taichi_unity as static instaed of shared library")
 
@@ -30,14 +30,14 @@ if (ANDROID)
     list(APPEND CMAKE_FIND_ROOT_PATH ${TAICHI_C_API_INSTALL_DIR}/lib)
 endif()
 
-find_library(taichi_c_api taichi_c_api HINTS ${TAICHI_C_API_INSTALL_DIR}/lib REQUIRED NO_CMAKE_FIND_ROOT_PATH)
+find_package(Taichi REQUIRED)
 
 set(INC_DIRS
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/external/Vulkan-Headers/include
     ${TAICHI_C_API_INSTALL_DIR}/include
 )
-set(LINK_LIBS ${taichi_c_api})
+set(LINK_LIBS Taichi::Runtime)
 
 include_directories(${INC_DIRS})
 file(GLOB SRCS "${PROJECT_SOURCE_DIR}/src/*")

@@ -55,7 +55,7 @@ struct RenderThreadLaunchKenelTask : public RenderThreadTask {
   }
 
   virtual void run_in_render_thread() override final {
-    ti_launch_kernel(runtime_, kernel_, args_.size(), args_.data());
+    ti_launch_kernel(runtime_, kernel_, (uint32_t)args_.size(), args_.data());
   }
 };
 
@@ -82,7 +82,7 @@ struct RenderThreadLaunchComputeGraphTask : public RenderThreadTask {
   }
 
   virtual void run_in_render_thread() override final {
-    ti_launch_compute_graph(runtime_, compute_graph_, args_.size(), args_.data());
+    ti_launch_compute_graph(runtime_, compute_graph_, (uint32_t)args_.size(), args_.data());
   }
 
 };
@@ -140,7 +140,7 @@ void UNITY_INTERFACE_API OnGfxDeviceEvent(UnityGfxDeviceEventType eventType) {
       break;
     }
 #endif // TI_WITH_METAL
-      // default: assert(false);
+    default: assert(false);
     }
     break;
   }

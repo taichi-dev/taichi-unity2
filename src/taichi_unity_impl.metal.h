@@ -16,4 +16,4 @@ struct PluginInstanceMetal : public PluginInstance {
   virtual TiMemory import_native_memory(TiRuntime runtime, TixNativeBufferUnity native_buffer) const override final;
 };
 
-#endif TI_WITH_METAL
+#endif // TI_WITH_METAL
