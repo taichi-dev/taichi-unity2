@@ -1,11 +1,12 @@
+#ifdef TI_WITH_VULKAN
 #include <cassert>
 #include <vector>
 #include <map>
 #include "taichi_unity_impl.vulkan.h"
 #include "Unity/IUnityGraphicsVulkan.h"
 
-PluginInstanceVulkan::PluginInstanceVulkan(IUnityGraphicsVulkan* unity_vulkan) :
-  unity_vulkan(unity_vulkan)
+PluginInstanceVulkan::PluginInstanceVulkan() :
+  unity_vulkan(UNITY_INTERFACES->Get<IUnityGraphicsVulkan>())
 {
   UnityVulkanPluginEventConfig event_cfg {};
   event_cfg.flags =
@@ -49,3 +50,5 @@ TiMemory PluginInstanceVulkan::import_native_memory(TiRuntime runtime, TixNative
   vmii.usage = unity_vulkan_buffer.usage;
   return ti_import_vulkan_memory(runtime, &vmii);
 }
+
+#endif // TI_WITH_VULKAN

@@ -1,7 +1,9 @@
 #include <cassert>
 #include <cstring>
 
+#include "taichi_unity_impl.h"
 #include "taichi_unity_impl.vulkan.h"
+#include "taichi_unity_impl.metal.h"
 
 IUnityInterfaces* UNITY_INTERFACES;
 IUnityGraphics* UNITY_GRAPHICS;
@@ -53,7 +55,7 @@ struct RenderThreadLaunchKenelTask : public RenderThreadTask {
   }
 
   virtual void run_in_render_thread() override final {
-    ti_launch_kernel(runtime_, kernel_, args_.size(), args_.data());
+    ti_launch_kernel(runtime_, kernel_, (uint32_t)args_.size(), args_.data());
   }
 };
 
@@ -80,7 +82,7 @@ struct RenderThreadLaunchComputeGraphTask : public RenderThreadTask {
   }
 
   virtual void run_in_render_thread() override final {
-    ti_launch_compute_graph(runtime_, compute_graph_, args_.size(), args_.data());
+    ti_launch_compute_graph(runtime_, compute_graph_, (uint32_t)args_.size(), args_.data());
   }
 
 };
@@ -124,13 +126,21 @@ void UNITY_INTERFACE_API OnGfxDeviceEvent(UnityGfxDeviceEventType eventType) {
   {
     UnityGfxRenderer renderer = UNITY_GRAPHICS->GetRenderer();
     switch (renderer) {
+#ifdef TI_WITH_VULKAN
     case kUnityGfxRendererVulkan:
     {
-      IUnityGraphicsVulkan* unity_graphics_vulkan = UNITY_INTERFACES->Get<IUnityGraphicsVulkan>();
-      INSTANCE = std::unique_ptr<PluginInstance>(new PluginInstanceVulkan(unity_graphics_vulkan));
+      INSTANCE = std::unique_ptr<PluginInstance>(new PluginInstanceVulkan());
       break;
     }
-    //default: assert(false);
+#endif // TI_WITH_VULKAN
+#ifdef TI_WITH_METAL
+    case kUnityGfxRendererMetal:
+    {
+      INSTANCE = std::unique_ptr<PluginInstance>(new PluginInstanceMetal());
+      break;
+    }
+#endif // TI_WITH_METAL
+    default: assert(false);
     }
     break;
   }
@@ -173,6 +183,8 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
 
 void UNITY_INTERFACE_API tix_render_thread_main(int32_t event_id) {
   if (INSTANCE == nullptr || RUNTIME_STATE == nullptr) { return; }
+
+  INSTANCE->render_thread_prelude();
 
   TiRuntime runtime = RUNTIME_STATE->runtime;
   std::vector<TixNativeBufferUnity> pending_native_buffer_imports;
