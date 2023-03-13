@@ -3,7 +3,6 @@
 #include <map>
 #include <memory>
 #include <queue>
-#define TI_WITH_VULKAN 1
 #include <vulkan/vulkan.h>
 #include "taichi_unity_impl.h"
 
