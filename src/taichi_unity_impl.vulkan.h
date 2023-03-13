@@ -3,7 +3,6 @@
 #include <map>
 #include <memory>
 #include <queue>
-#include <vulkan/vulkan.h>
 #include "taichi_unity_impl.h"
 
 struct PluginInstanceVulkan : public PluginInstance {
