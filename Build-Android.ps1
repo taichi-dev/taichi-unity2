@@ -4,6 +4,7 @@ if (-not(Test-Path "build-android-aarch64")) {
 
 Push-Location "build-android-aarch64"
 cmake -DCMAKE_BUILD_TYPE=Release `
+    -DCMAKE_INSTALL_PREFIX="./install" `
     -DCMAKE_TOOLCHAIN_FILE="$env:ANDROID_NDK/build/cmake/android.toolchain.cmake" `
     -DANDROID_ABI="arm64-v8a" `
     -DANDROID_PLATFORM=android-26 `
@@ -11,4 +12,5 @@ cmake -DCMAKE_BUILD_TYPE=Release `
     -DTAICHI_C_API_INSTALL_DIR="$env:TAICHI_C_API_INSTALL_DIR" `
     ..
 cmake --build . -t taichi_unity
+cmake --build . -t install
 Pop-Location
