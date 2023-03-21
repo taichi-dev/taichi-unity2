@@ -10,5 +10,6 @@ cmake -DCMAKE_BUILD_TYPE=Release \
     ..
 
 cmake --build . -t taichi_unity
+cmake --build . -t install
 
 popd
