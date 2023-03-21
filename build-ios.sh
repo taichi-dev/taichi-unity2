@@ -12,7 +12,7 @@ echo Using Taichi Runtime at $TAICHI_C_API_INSTALL_DIR
 rm -rf build-ios-arm64
 mkdir build-ios-arm64
 pushd build-ios-arm64
-cmake -DCMAKE_BUILD_TYPE=Debug \
+cmake -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="tmp/ios.toolchain.cmake" \
     -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED="NO" \
     -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED="NO" \
