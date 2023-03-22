@@ -2,8 +2,13 @@
 #include <cstring>
 
 #include "taichi_unity_impl.h"
+#ifdef TI_WITH_VULKAN
 #include "taichi_unity_impl.vulkan.h"
+#endif // TI_WITH_VULKAN
+
+#ifdef TI_WITH_METAL
 #include "taichi_unity_impl.metal.h"
+#endif // TI_WITH_METAL
 
 IUnityInterfaces* UNITY_INTERFACES;
 IUnityGraphics* UNITY_GRAPHICS;
