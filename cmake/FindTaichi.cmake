@@ -117,7 +117,7 @@ if(("Runtime" IN_LIST Taichi_FIND_COMPONENTS) AND (NOT TARGET Taichi::Runtime))
         # Already found in config mode.
         get_target_property(Taichi_Runtime_CONFIG taichi_c_api IMPORTED_CONFIGURATIONS)
         if(${CMAKE_SYSTEM_NAME} STREQUAL Windows)
-            get_target_property(Taichi_Runtime_LIBRARY taichi_c_api IMPORTED_IMPLIB)
+            get_target_property(Taichi_Runtime_LIBRARY taichi_c_api IMPORTED_IMPLIB_RELEASE)
         else()
             get_target_property(Taichi_Runtime_LIBRARY taichi_c_api LOCATION)
         endif()
