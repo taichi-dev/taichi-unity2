@@ -1,10 +1,10 @@
 #!/bin/bash
-
-if [[ -z "tmp/ios.toolchain.cmake" ]]; then
-    if [[ -z "tmp" ]]; then
+set -x
+if [[ ! -f "tmp/ios.toolchain.cmake" ]]; then
+    if [[ ! -e "tmp" ]]; then
         mkdir tmp
     fi
-    wget https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o tmp/ios.toolchain.cmake
+    curl https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o tmp/ios.toolchain.cmake
 fi
 
 echo Using Taichi Runtime at $TAICHI_C_API_INSTALL_DIR
